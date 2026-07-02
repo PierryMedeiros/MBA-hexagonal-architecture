@@ -26,6 +26,7 @@ public class Event {
     private LocalDate date;
     private int totalSpots;
     private PartnerId partnerId;
+    private boolean cancelled;
 
     public Event(
             final EventId eventId,
@@ -33,6 +34,7 @@ public class Event {
             final String date,
             final Integer totalSpots,
             final PartnerId partnerId,
+            final boolean cancelled,
             final Set<EventTicket> tickets
     ) {
         this(eventId, tickets);
@@ -40,6 +42,7 @@ public class Event {
         this.setDate(date);
         this.setTotalSpots(totalSpots);
         this.setPartnerId(partnerId);
+        this.cancelled = cancelled;
     }
 
     private Event(final EventId eventId, final Set<EventTicket> tickets) {
@@ -53,7 +56,7 @@ public class Event {
     }
 
     public static Event newEvent(final String name, final String date, final Integer totalSpots, final Partner partner) {
-        return new Event(EventId.unique(), name, date, totalSpots, partner.partnerId(), null);
+        return new Event(EventId.unique(), name, date, totalSpots, partner.partnerId(), false, null);
     }
 
     public static Event restore(
@@ -62,12 +65,26 @@ public class Event {
             final String date,
             final int totalSpots,
             final String partnerId,
+            final boolean cancelled,
             final Set<EventTicket> tickets
     ) {
-        return new Event(EventId.with(id), name, date, totalSpots, PartnerId.with(partnerId), tickets);
+        return new Event(EventId.with(id), name, date, totalSpots, PartnerId.with(partnerId), cancelled, tickets);
+    }
+
+    public void cancel() {
+        if (this.cancelled) {
+            throw new ValidationException("Event already cancelled");
+        }
+
+        this.cancelled = true;
+        this.domainEvents.add(new EventCancelled(eventId()));
     }
 
     public EventTicket reserveTicket(final CustomerId aCustomerId) {
+        if (this.cancelled) {
+            throw new ValidationException("Event is cancelled");
+        }
+
         this.allTickets().stream()
                 .filter(it -> Objects.equals(it.customerId(), aCustomerId))
                 .findFirst()
@@ -106,6 +123,10 @@ public class Event {
 
     public PartnerId partnerId() {
         return partnerId;
+    }
+
+    public boolean cancelled() {
+        return cancelled;
     }
 
     public Set<EventTicket> allTickets() {
